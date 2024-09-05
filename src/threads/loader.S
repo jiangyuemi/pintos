@@ -14,7 +14,7 @@
 #### a different drive from the loader, so we don't take advantage of
 #### this.
 
-# Runs in real mode, which is a 16-bit segment.
+# Runs in real mode, which is a 16-bit segment. (maybe i8086)
 	.code16
 
 # Set up segment registers.
@@ -31,7 +31,7 @@
 	sub %dx, %dx			# Serial port 0.
 	mov $0xe3, %al			# 9600 bps, N-8-1.
 					# AH is already 0 (Initialize Port).
-	int $0x14			# Destroys AX.
+	int $0x14			# Destroys AX. # 
 
 	call puts
 	.string "Pintos"
@@ -53,7 +53,7 @@ read_mbr:
 	mov $0x2000, %ax		# Use 0x20000 for buffer.
 	mov %ax, %es
 	call read_sector
-	jc no_such_drive
+	jc no_such_drive   
 
 	# Print hd[a-z].
 	call puts
@@ -120,6 +120,7 @@ load_kernel:
 	# But we limit Pintos kernels to 512 kB for other reasons, so
 	# it's easy enough to just read the entire contents of the
 	# partition or 512 kB from disk, whichever is smaller.
+	
 	mov %es:12(%si), %ecx		# EBP = number of sectors
 	cmp $1024, %ecx			# Cap size at 512 kB
 	jbe 1f
