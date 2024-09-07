@@ -240,7 +240,7 @@ read_sector:
 	push $16			# Packet size
 	mov $0x42, %ah			# Extended read
 	mov %sp, %si			# DS:SI -> packet
-	int $0x13			# Error code in CF
+	int $0x13			# Error code in CF 如果读取扇区失败则设置CF=1方便执行jc no_such_drive
 	popa				# Pop 16 bytes, preserve flags
 popa_ret:
 	popa

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "devices/intq.h"
 #include "devices/kbd.h"
 #include "devices/input.h"
 #include "devices/serial.h"
@@ -62,7 +63,9 @@ static void paging_init (void);
 
 static char **read_command_line (void);
 static char **parse_options (char **argv);
+static char* gets(char *buf, int max);
 static void run_actions (char **argv);
+static void run_kernel_shell();
 static void usage (void);
 
 #ifdef FILESYS
@@ -133,7 +136,7 @@ pintos_init (void)
     /* Run actions specified on kernel command line. */
     run_actions (argv);
   } else {
-    // TODO: no command line passed to kernel. Run interactively 
+    run_kernel_shell();
   }
 
   /* Finish up. */
@@ -165,23 +168,21 @@ paging_init (void)
   size_t page;
   extern char _start, _end_kernel_text;
 
-  pd = init_page_dir = palloc_get_page (PAL_ASSERT | PAL_ZERO);
-  pt = NULL;
-  for (page = 0; page < init_ram_pages; page++)
-    {
+  pd = init_page_dir = palloc_get_page (PAL_ASSERT | PAL_ZERO); // page dir
+  pt = NULL;                                                    // page table
+  for (page = 0; page < init_ram_pages; page++) {
       uintptr_t paddr = page * PGSIZE;
       char *vaddr = ptov (paddr);
       size_t pde_idx = pd_no (vaddr);
       size_t pte_idx = pt_no (vaddr);
       bool in_kernel_text = &_start <= vaddr && vaddr < &_end_kernel_text;
 
-      if (pd[pde_idx] == 0)
-        {
-          pt = palloc_get_page (PAL_ASSERT | PAL_ZERO);
-          pd[pde_idx] = pde_create (pt);
+      if (pd[pde_idx] == 0) {
+          pt = palloc_get_page (PAL_ASSERT | PAL_ZERO); // return vaddr
+          pd[pde_idx] = pde_create (pt);  // return paddr
         }
 
-      pt[pte_idx] = pte_create_kernel (vaddr, !in_kernel_text);
+      pt[pte_idx] = pte_create_kernel (vaddr, !in_kernel_text); // return paddr
     }
 
   /* Store the physical address of the page directory into CR3
@@ -281,6 +282,25 @@ parse_options (char **argv)
   return argv;
 }
 
+/** get user types from the keyboard, if the character is printable 
+   display the character, Handling special input such as backspace is not required. */
+static char*
+gets(char *buf, int max)
+{
+  int i, cc;
+  uint8_t c;
+
+  for(i=0; i+1 < max; ){
+    c = input_getc();
+    printf("%c", c);
+    if(c == '\n' || c == '\r')
+      break;
+    buf[i++] = c;
+  }
+  buf[i] = '\0';
+  return buf;
+}
+
 /** Runs the task specified in ARGV[1]. */
 static void
 run_task (char **argv)
@@ -345,6 +365,34 @@ run_actions (char **argv)
       argv += a->argc;
     }
   
+}
+
+/** If there is no command line argument passed run this tiny kernel shell
+   "whoami" ---- print your student id
+   "exit"   ---- quit the monitor will to allow the kernel to finish
+   other    ---- print invalid command
+*/
+static void
+run_kernel_shell()
+{
+  // TODO: no command line passed to kernel. Run interactively
+  char buf[INTQ_BUFSIZE] = {0};
+  char *op1 = "whoami";
+  char *op2 = "exit";
+  for(;;){
+    printf("PKUOS » ");
+    memset(buf, '\0', INTQ_BUFSIZE); // clear
+    gets(buf, INTQ_BUFSIZE); // get input
+    printf("\n"); 
+    
+    if (strcmp(buf, op1) == 0){
+        printf("Refrain\n");
+    } else if(strcmp(buf, op2) == 0){
+        return;
+    } else {
+        printf("invalid command.\n");
+    }
+  }
 }
 
 /** Prints a kernel command line help message and powers off the

@@ -33,7 +33,7 @@ input_getc (void)
   enum intr_level old_level;
   uint8_t key;
 
-  old_level = intr_disable ();
+  old_level = intr_disable (); // 关闭中断 !!! intr_disable() does not disable internal interrupts.
   key = intq_getc (&buffer);
   serial_notify ();
   intr_set_level (old_level);

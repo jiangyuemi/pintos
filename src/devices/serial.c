@@ -151,7 +151,7 @@ serial_notify (void)
   if (mode == QUEUE)
     write_ier ();
 }
-
+
 /** Configures the serial port for BPS bits per second. */
 static void
 set_serial (int bps)

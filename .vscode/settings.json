@@ -1,0 +1,20 @@
+{
+  "files.associations": {
+    "*.go": "go",
+    "stdint.h": "c",
+    "cstdio": "c",
+    "stdio.h": "c",
+    "intq.h": "c",
+    "*.inc": "c",
+    "*.tcc": "c",
+    "memory_resource": "c",
+    "memory": "c",
+    "ostream": "c",
+    "streambuf": "c",
+    "iosfwd": "c",
+    "limits": "c",
+    "string.h": "c",
+    "input.h": "c",
+    "debug.h": "c"
+  }
+}

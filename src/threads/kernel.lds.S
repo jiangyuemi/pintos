@@ -7,14 +7,14 @@ ENTRY(start)			/* 指定入口点, 即程序第一条被执行的指令所在之
 
 SECTIONS
 {
-  _start = LOADER_PHYS_BASE + LOADER_KERN_BASE; //内核基地址
-  . = _start + SIZEOF_HEADERS;  // 单独一个'.'表示当前位置 预留ELF头的空间
+  /*内核基地址=0xc0000000+0x20000*/
+  _start = LOADER_PHYS_BASE + LOADER_KERN_BASE; 
+
+  /*单独一个'.'表示当前位置 预留ELF头的空间*/
+  . = _start + SIZEOF_HEADERS;
 
   /* Kernel starts with code, followed by read-only data and writable data. */
-
-  .text : { 
-    *(.start) *(.text) 
-    } = 0x90; // 未初始化空间填充为0x90
+  .text : { *(.start) *(.text) } = 0x90
   
   .rodata : {
     *(.rodata) *(.rodata.*); 
@@ -28,12 +28,15 @@ SECTIONS
     LONG(0xaa55aa55)
   }
 
-  _start_bss = .; // 设置BSS(zero-initialized data)段开始的位置
+  /*设置BSS(zero-initialized data)段开始的位置*/
+  _start_bss = .;
   .bss : {
     *(.bss) 
   }
-  _end_bss = .;   //设置bss段结束的位置
-  _end = .;  // 设置内核结束的位置
+
+  /*设置bss段结束的位置, 以及内核结束的位置*/
+  _end_bss = .;
+  _end = .;
 
   ASSERT (_end - _start <= 512K, "Kernel image is too big.")
 }
