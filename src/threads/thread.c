@@ -91,7 +91,7 @@ thread_init (void)
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
-  initial_thread = running_thread ();
+  initial_thread = running_thread (); // 0xc000e000
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
@@ -159,10 +159,13 @@ thread_print_stats (void)
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
+
+
 tid_t
-thread_create (const char *name, int priority,
-               thread_func *function, void *aux) 
-{
+thread_create (const char  *name,
+               int         priority,
+               thread_func *function,
+               void        *aux) {
   struct thread *t;
   struct kernel_thread_frame *kf;
   struct switch_entry_frame *ef;
@@ -320,12 +323,10 @@ thread_foreach (thread_action_func *func, void *aux)
 
   ASSERT (intr_get_level () == INTR_OFF);
 
-  for (e = list_begin (&all_list); e != list_end (&all_list);
-       e = list_next (e))
-    {
-      struct thread *t = list_entry (e, struct thread, allelem);
-      func (t, aux);
-    }
+  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)) {
+    struct thread *t = list_entry (e, struct thread, allelem);
+    func (t, aux);
+  }
 }
 
 /** Sets the current thread's priority to NEW_PRIORITY. */
@@ -422,19 +423,27 @@ kernel_thread (thread_func *function, void *aux)
   thread_exit ();       /**< If function() returns, kill the thread. */
 }
 
-/** Returns the running thread. */
-struct thread *
-running_thread (void) 
-{
-  uint32_t *esp;
 
-  /* Copy the CPU's stack pointer into `esp', and then round that
-     down to the start of a page.  Because `struct thread' is
-     always at the beginning of a page and the stack pointer is
-     somewhere in the middle, this locates the curent thread. */
+/**
+ * @brief Query the running thread
+ * 
+ * @note  Copy the CPU\'s stack pointer into `esp`, and then round that
+ *        down to the start of a page.  Because `struct thread` is
+ *        always at the beginning of a page and the stack pointer is
+ *        somewhere in the middle, this locates the curent thread.
+ * 
+ * @return The metadata handle of the running thread
+ * 
+ * @retval A TCB point : point to the start of a page which store the
+ *         TCB.
+*/
+struct thread *
+running_thread (void)  {
+  uint32_t *esp;
   asm ("mov %%esp, %0" : "=g" (esp));
   return pg_round_down (esp);
 }
+
 
 /** Returns true if T appears to point to a valid thread. */
 static bool
@@ -479,47 +488,63 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
-/** Chooses and returns the next thread to be scheduled.  Should
-   return a thread from the run queue, unless the run queue is
-   empty.  (If the running thread can continue running, then it
-   will be in the run queue.)  If the run queue is empty, return
-   idle_thread. */
+
+/**
+ * @brief Find the next thread to be scheduled.
+ * 
+ * @note  Should return a thread from the run queue, unless the run
+ *        queue is (If the running thread can continue running, then it
+ *        will be in the run queue.)  If the run queue is empty, return
+ *        `idle_thread`.
+ * 
+ * @return The TCB(Thread Control Block) handle of the found thread, 
+ *         If `ready_list` is empty return the `idle_thread`.
+ * 
+ * @retval A TCB point : point to the start of a page which store the
+ *         TCB.
+*/
 static struct thread *
-next_thread_to_run (void) 
-{
-  if (list_empty (&ready_list))
+next_thread_to_run (void) {
+  if (list_empty (&ready_list)){
     return idle_thread;
-  else
+  } else {
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  }
 }
 
-/** Completes a thread switch by activating the new thread's page
-   tables, and, if the previous thread is dying, destroying it.
-
-   At this function's invocation, we just switched from thread
-   PREV, the new thread is already running, and interrupts are
-   still disabled.  This function is normally invoked by
-   thread_schedule() as its final action before returning, but
-   the first time a thread is scheduled it is called by
-   switch_entry() (see switch.S).
-
-   It's not safe to call printf() until the thread switch is
-   complete.  In practice that means that printf()s should be
-   added at the end of the function.
-
-   After this function and its caller returns, the thread switch
-   is complete. */
+/**
+ * @brief Completes a thread switch
+ * 
+ * @note This function is normally invoked by
+ *       thread_schedule() as its final action before returning, but
+ *       the first time a thread is scheduled it is called by
+ *       switch_entry() (see switch.S). 
+ *       After this function and its caller returns, the thread switch
+ *       is complete. Here are what the func do:
+ * @note - Set the new thread\'s status to `THREAD_RUNNING`
+ * @note - Reset the `thread_ticks` to zero.
+ * @note - If the previous thread is THREAD_DYING, call `palloc_free_page()`
+ *       destroying it. This must happen late so that `thread_exit()` doesn't
+ *       pull out the rug under itself.
+ * 
+ * @param[in] prev We switched from thread prev to cur
+ * 
+ * @warning - Interrupts must still be disabled. 
+ * @warning - We can\'t destroying the `initial_thread`, because its
+ *          memory was not obtained via `palloc()`.
+ * @warning - It's not safe to call `printf()`,
+ *          In practice that means that `printf()s` should be
+ *          added at the end of the function.
+ * 
+ * @todo Answer why destroy the prev must happen late.
+*/
 void
-thread_schedule_tail (struct thread *prev)
-{
+thread_schedule_tail (struct thread *prev) {
   struct thread *cur = running_thread ();
   
   ASSERT (intr_get_level () == INTR_OFF);
 
-  /* Mark us as running. */
   cur->status = THREAD_RUNNING;
-
-  /* Start new time slice. */
   thread_ticks = 0;
 
 #ifdef USERPROG
@@ -527,28 +552,29 @@ thread_schedule_tail (struct thread *prev)
   process_activate ();
 #endif
 
-  /* If the thread we switched from is dying, destroy its struct
-     thread.  This must happen late so that thread_exit() doesn't
-     pull out the rug under itself.  (We don't free
-     initial_thread because its memory was not obtained via
-     palloc().) */
-  if (prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) 
-    {
-      ASSERT (prev != cur);
-      palloc_free_page (prev);
-    }
+  if(prev != NULL && prev->status == THREAD_DYING && prev != initial_thread) {
+    ASSERT (prev != cur);
+    palloc_free_page (prev);
+  }
 }
 
-/** Schedules a new process.  At entry, interrupts must be off and
-   the running process's state must have been changed from
-   running to some other state.  This function finds another
-   thread to run and switches to it.
-
-   It's not safe to call printf() until thread_schedule_tail()
-   has completed. */
+/**
+ * @brief   Thread Switching, Schedules a new process.
+ * 
+ * @note - Record the current thread in local variable `cur`.
+ * @note - Use `next_thread_to_run()` to find the next thread to run, record it in
+ *       local variable `next`.
+ * @note - Call `switch_threads()` to do the actual thread switch.
+ * @note - Finally call `thread_schedule_tail()` to completed this switch.
+ * 
+ * @warning - It's not safe to call printf() until thread_schedule_tail()
+ *          has completed.
+ * @warning - At entry, interrupts must be off
+ * @warning - the running process's state must have been changed from
+ *          running to some other state.
+*/
 static void
-schedule (void) 
-{
+schedule (void) {
   struct thread *cur = running_thread ();
   struct thread *next = next_thread_to_run ();
   struct thread *prev = NULL;
@@ -557,8 +583,10 @@ schedule (void)
   ASSERT (cur->status != THREAD_RUNNING);
   ASSERT (is_thread (next));
 
-  if (cur != next)
+  if (cur != next) {
     prev = switch_threads (cur, next);
+  }
+
   thread_schedule_tail (prev);
 }
 
