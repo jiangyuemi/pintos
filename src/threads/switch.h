@@ -17,9 +17,6 @@ struct switch_threads_frame
 /** 
  * @brief switch from one Thread(cur) to another Thread(next)
  * 
- * @note  This function works by assuming that the thread we're switching
- *        into is also running switch_threads(). Thus, all it has to do is
- *        preserve a few registers on the stack.
  * @note - Save registers on the stack.
  * @note - Save current stack pointer to current `struct thread`\'s `stack` member.
  * @note - Restores the new `thread`\'s `stack` into the CPU\'s stack pointer.
@@ -30,7 +27,17 @@ struct switch_threads_frame
  * 
  * @return returning cur in next's context
  * 
- * @retval return with a struct point
+ * @retval return a point to a TCB
+ * 
+ * @warning - The `cur` thread must be the running thread.
+ * @warning - The `next` thread must also be running `switch_threads()`.
+ * 
+ * 
+ * This function works by assuming that the thread we're switching
+ *          into is also running switch_threads(). Thus, all it has to do is
+ *          preserve a few registers on the stack.
+ * 
+ * @todo what meaning the return ?
 */
 struct thread *switch_threads (struct thread *cur,
                                struct thread *next);

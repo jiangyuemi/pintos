@@ -122,18 +122,21 @@ thread_tick (void)
   struct thread *t = thread_current ();
 
   /* Update statistics. */
-  if (t == idle_thread)
+  if (t == idle_thread) {
     idle_ticks++;
+  }
 #ifdef USERPROG
   else if (t->pagedir != NULL)
     user_ticks++;
 #endif
-  else
+  else {
     kernel_ticks++;
-
+  }
+  
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
+  if (++thread_ticks >= TIME_SLICE) {
     intr_yield_on_return ();
+  }
 }
 
 /** Prints thread statistics. */
@@ -159,7 +162,6 @@ thread_print_stats (void)
    The code provided sets the new thread's `priority' member to
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
-
 
 tid_t
 thread_create (const char  *name,
@@ -299,26 +301,29 @@ thread_exit (void)
 /** Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void
-thread_yield (void) 
-{
+thread_yield (void) {
   struct thread *cur = thread_current ();
   enum intr_level old_level;
   
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
+  
+  if (cur != idle_thread) {
     list_push_back (&ready_list, &cur->elem);
+  }
+
   cur->status = THREAD_READY;
-  schedule ();
+  
+  schedule (); // weweq
+  
   intr_set_level (old_level);
 }
 
 /** Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
-thread_foreach (thread_action_func *func, void *aux)
-{
+thread_foreach (thread_action_func *func, void *aux) {
   struct list_elem *e;
 
   ASSERT (intr_get_level () == INTR_OFF);
@@ -338,9 +343,8 @@ thread_set_priority (int new_priority)
 
 /** Returns the current thread's priority. */
 int
-thread_get_priority (void) 
-{
-  return thread_current ()->priority;
+thread_get_priority (void) {
+  return thread_current ()->priority; 
 }
 
 /** Sets the current thread's nice value to NICE. */
@@ -529,10 +533,10 @@ next_thread_to_run (void) {
  * 
  * @param[in] prev We switched from thread prev to cur
  * 
- * @warning - Interrupts must still be disabled. 
- * @warning - We can\'t destroying the `initial_thread`, because its
+ * @warning 1. Interrupts must still be disabled. 
+ * @warning 2. We can\'t destroying the `initial_thread`, because its
  *          memory was not obtained via `palloc()`.
- * @warning - It's not safe to call `printf()`,
+ * @warning 3. It's not safe to call `printf()`,
  *          In practice that means that `printf()s` should be
  *          added at the end of the function.
  * 
@@ -559,7 +563,7 @@ thread_schedule_tail (struct thread *prev) {
 }
 
 /**
- * @brief   Thread Switching, Schedules a new process.
+ * @brief Thread Switching, Schedules a new process.
  * 
  * @note - Record the current thread in local variable `cur`.
  * @note - Use `next_thread_to_run()` to find the next thread to run, record it in

@@ -375,7 +375,6 @@ run_actions (char **argv)
 static void
 run_kernel_shell()
 {
-  // TODO: no command line passed to kernel. Run interactively
   char buf[INTQ_BUFSIZE] = {0};
   char *op1 = "whoami";
   char *op2 = "exit";

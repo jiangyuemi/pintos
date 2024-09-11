@@ -57,8 +57,7 @@ typedef int tid_t;
    (they are mutually exclusive) */
 
    
-struct thread
-  {
+struct thread {
     /* Owned by thread.c. */
     tid_t tid;                          /**< Thread identifier. */
     enum thread_status status;          /**< Thread state. */

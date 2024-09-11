@@ -1,10 +1,11 @@
 #include "threads/switch.h"
 
-#### struct thread *switch_threads (struct thread *cur, struct thread *next);
+#### struct thread *switch_threads (struct thread *cur,
+####                                struct thread *next)
 ####
-#### Switches from CUR, which must be the running thread, to NEXT,
-#### which must also be running switch_threads(), returning CUR in
-#### NEXT's context.
+#### Switches from cur, which must be the running thread, to next,
+#### which must also be running switch_threads(), returning cur in
+#### next's context.
 ####
 #### This function works by assuming that the thread we're switching
 #### into is also running switch_threads().  Thus, all it has to do is
