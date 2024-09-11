@@ -25,7 +25,7 @@ struct switch_threads_frame
  * @param[in]  cur  Current thread, must be the running thread
  * @param[in]  next Thread will switch to, running switch_threads() 
  * 
- * @return returning cur in next's context
+ * @return returning `cur` in `next`\'s context
  * 
  * @retval return a point to a TCB
  * 
@@ -38,6 +38,9 @@ struct switch_threads_frame
  *          preserve a few registers on the stack.
  * 
  * @todo what meaning the return ?
+ * @todo understand the thread switch (think about xv6)
+ * @todo in switch_threads, care about the regs: movl SWITCH_CUR(%esp), %eax
+ *       because it is the return regs.
 */
 struct thread *switch_threads (struct thread *cur,
                                struct thread *next);

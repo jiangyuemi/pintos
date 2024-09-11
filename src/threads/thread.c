@@ -546,7 +546,7 @@ void
 thread_schedule_tail (struct thread *prev) {
   struct thread *cur = running_thread ();
   
-  ASSERT (intr_get_level () == INTR_OFF);
+  ASSERT (intr_get_level () == INTR_OFF); 
 
   cur->status = THREAD_RUNNING;
   thread_ticks = 0;
@@ -563,19 +563,19 @@ thread_schedule_tail (struct thread *prev) {
 }
 
 /**
- * @brief Thread Switching, Schedules a new process.
+ * @brief Thread Switching, Schedules a new thread.
  * 
  * @note - Record the current thread in local variable `cur`.
  * @note - Use `next_thread_to_run()` to find the next thread to run, record it in
- *       local variable `next`.
+ *         local variable `next`.
  * @note - Call `switch_threads()` to do the actual thread switch.
  * @note - Finally call `thread_schedule_tail()` to completed this switch.
  * 
  * @warning - It's not safe to call printf() until thread_schedule_tail()
- *          has completed.
- * @warning - At entry, interrupts must be off
- * @warning - the running process's state must have been changed from
- *          running to some other state.
+ *            has completed.
+ * @warning - At entry, interrupts must be off.
+ * @warning - the running thread's state must have been changed from
+ *            running to some other state.
 */
 static void
 schedule (void) {
@@ -587,9 +587,31 @@ schedule (void) {
   ASSERT (cur->status != THREAD_RUNNING);
   ASSERT (is_thread (next));
 
-  if (cur != next) {
-    prev = switch_threads (cur, next);
+  /** @attention
+   * The first trick happend here: we moved all the return val of call 
+   * `running_thread ()` or `next_thread_to_run ()`, even `NULL` into 
+   * stack for further used---We used `cur` and `next` in the stack at 
+   * assembly code `switch_threads` next step. (in the file `switch.S` )
+  */
+
+  /** @todo think over why we need the local variable `prev` */
+  if (cur != next) { 
+    prev = switch_threads(cur, next);
   }
+
+  /** @attention
+   * The other trick happend here, in fact, this trick used twice in the
+   * file `switch.S`, if you take care the changes in $esp values, when
+   * you are reading code in `switch.S`, (make sure that you know what
+   * `thread_create()` done, and the stack's change in `switch_threads()`)
+   * and is familiar with the procedure-calling in `X86`, (you can stduy in
+   * CSAPP chapter-3) you will find that the control transfer here like this:
+   * call `schedule()` --> call `switch_threads()` --> return to `switch_entry()`
+   * --> call `thread_schedule_tail()` --> return to `kernel_thread()`
+   * 
+   * This trick is made possible by the fact that we need to write assembly code
+   * by hand.
+  */
 
   thread_schedule_tail (prev);
 }
