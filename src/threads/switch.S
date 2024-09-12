@@ -69,3 +69,42 @@ switch_entry:
 
 	ret                      # Start thread proper.   to kernel_thread
 .endfunc
+
+
+
+#调用之初main线程的栈内容
+#
+# +---------------------------------+ 
+# |               		            | 
+# |               prev              | 
+# |               cur               | 
+# |      		  next			    | 
+# |               next              |  
+# |               cur               |
+# |      	return address          |
+# |               ebx               |
+# |               ebp               |
+# |               esi               |
+# |               edi               | 
+# +---------------------------------+ 
+#
+#struct kernel_thread_frame 
+#  {
+#    void *eip;                  /**< Return address. */
+#    thread_func *function;      /**< Function to call. */
+#    void *aux;                  /**< Auxiliary data for function. */
+#  };
+#struct switch_threads_frame 
+#  {
+#    uint32_t edi;               /**<  0: Saved %edi. */
+#    uint32_t esi;               /**<  4: Saved %esi. */
+#    uint32_t ebp;               /**<  8: Saved %ebp. */
+#    uint32_t ebx;               /**< 12: Saved %ebx. */
+#    void (*eip) (void);         /**< 16: Return address. */
+#    struct thread *cur;         /**< 20: switch_threads()'s CUR argument. */
+#    struct thread *next;        /**< 24: switch_threads()'s NEXT argument. */
+#  };
+#struct switch_entry_frame
+#  {
+#    void (*eip) (void);
+#  };

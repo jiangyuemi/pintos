@@ -315,7 +315,7 @@ thread_yield (void) {
 
   cur->status = THREAD_READY;
   
-  schedule (); // weweq
+  schedule (); //
   
   intr_set_level (old_level);
 }
@@ -458,6 +458,11 @@ is_thread (struct thread *t)
 
 /** Does basic initialization of T as a blocked thread named
    NAME. */
+
+/**
+ * @brief init thread's name,priority,magic and set thread's status to block.join the thread to all list 
+
+ */
 static void
 init_thread (struct thread *t, const char *name, int priority)
 {
