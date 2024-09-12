@@ -32,93 +32,126 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
-/** Initializes semaphore SEMA to VALUE.  A semaphore is a
-   nonnegative integer along with two atomic operators for
-   manipulating it:
 
-   - down or "P": wait for the value to become positive, then
-     decrement it.
-
-   - up or "V": increment the value (and wake up one waiting
-     thread, if any). */
+/**
+ * @brief Initializes `sema` as a new semaphore with the given initial `value`
+ * 
+ * @note - down or "P": wait for the value to become positive, then
+ *         decrement it.
+ * @note - up or "V": increment the value (and wake up one waiting
+ *         thread, if any)
+ * 
+ * @warning A semaphore is a nonnegative integer along with two atomic operators
+*/
 void
-sema_init (struct semaphore *sema, unsigned value) 
-{
+sema_init (struct semaphore *sema,
+           unsigned         value) {
   ASSERT (sema != NULL);
 
   sema->value = value;
   list_init (&sema->waiters);
 }
 
-/** Down or "P" operation on a semaphore.  Waits for SEMA's value
-   to become positive and then atomically decrements it.
 
-   This function may sleep, so it must not be called within an
-   interrupt handler.  This function may be called with
-   interrupts disabled, but if it sleeps then the next scheduled
-   thread will probably turn interrupts back on. */
+/**
+ * @brief Executes the "down" or "P" operation on `sema`. Waits for `sema`\'s
+ *        value to become positive and then atomically decrements it.
+ * 
+ * @note - Use `intr_disable()` to disable the interrupts.
+ * @note - Wait for the `sema->value` to be 0.  That is: if `sema->value` is
+ *         not 0 now, put current thread into `sema->waiters` and call
+ *         `thread_block()` to sleep.
+ * 
+ * @warning - This function may sleep, so it must not be called in an
+ *          interrupt handler.
+ * @warning - This function must disable the interrupt to ensue atomicity.
+ * @warning - This function may be called with interrupts disabled, but
+ *          if it sleeps then the next scheduled thread will probably
+ *          turn interrupts back on.
+*/
 void
-sema_down (struct semaphore *sema) 
-{
+sema_down (struct semaphore *sema) {
   enum intr_level old_level;
 
   ASSERT (sema != NULL);
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  while (sema->value == 0) 
-    {
-      list_push_back (&sema->waiters, &thread_current ()->elem);
-      thread_block ();
-    }
+
+  while (sema->value == 0) {
+    list_push_back (&sema->waiters, &thread_current ()->elem);
+    thread_block ();
+  }
   sema->value--;
   intr_set_level (old_level);
 }
 
-/** Down or "P" operation on a semaphore, but only if the
-   semaphore is not already 0.  Returns true if the semaphore is
-   decremented, false otherwise.
 
-   This function may be called from an interrupt handler. */
+/**
+ * @brief Try to executes the "down" or "P" operation on `sema`, without 
+ *        sleeping or waiting or blocking.
+ * 
+ * @note - Use `intr_disable()` to disable the interrupts.
+ * @note - Try to executes "down" on semaphore `sema`.
+ * 
+ * @warning - This function wil not sleep, so it may be called from an interrupt handler.
+ * @warning - This function must disable the interrupt to ensue atomicity.
+ * @warning - Calling this function in a tight loop will waste CPU time, so use `sema_down()` 
+ *            or find a different approach instead.
+ * 
+ * @return Returns true if `sema->value` was successfully decremented, 
+ *         or false if it was already zero and thus could not be decremented
+*/
 bool
-sema_try_down (struct semaphore *sema) 
-{
+sema_try_down (struct semaphore *sema) {
   enum intr_level old_level;
   bool success;
 
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (sema->value > 0) 
-    {
-      sema->value--;
-      success = true; 
-    }
-  else
+
+  if (sema->value > 0) {
+    sema->value--;
+    success = true; 
+  } else {
     success = false;
+  }
+
   intr_set_level (old_level);
 
   return success;
 }
 
-/** Up or "V" operation on a semaphore.  Increments SEMA's value
-   and wakes up one thread of those waiting for SEMA, if any.
 
-   This function may be called from an interrupt handler. */
+/**
+ * @brief Up or "V" operation on a semaphore `sema`. Increment `sema->value`
+ *        and wake up one thread in `sema->waiters`, if any.
+ * 
+ * @note - Use `intr_disable()` to disable the interrupts.
+ * @note - Find a thread in `sema->waiters`, and wake up it, if any.
+ * @note - Increment the `sema->value`.
+ * 
+ * @warning - This function wil not sleep, so it may be called from an interrupt handler.
+ * @warning - This function must disable the interrupt to ensue atomicity.
+*/
 void
-sema_up (struct semaphore *sema) 
-{
+sema_up (struct semaphore *sema) {
   enum intr_level old_level;
 
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+
+  if (!list_empty (&sema->waiters)) {
+    thread_unblock (list_entry(list_pop_front(&sema->waiters), struct thread, elem));
+  }
+
   sema->value++;
+
   intr_set_level (old_level);
 }
+
 
 static void sema_test_helper (void *sema_);
 
@@ -126,8 +159,7 @@ static void sema_test_helper (void *sema_);
    between a pair of threads.  Insert calls to printf() to see
    what's going on. */
 void
-sema_self_test (void) 
-{
+sema_self_test (void) {
   struct semaphore sema[2];
   int i;
 
@@ -156,7 +188,7 @@ sema_test_helper (void *sema_)
       sema_up (&sema[1]);
     }
 }
-
+
 /** Initializes LOCK.  A lock can be held by at most a single
    thread at any given time.  Our locks are not "recursive", that
    is, it is an error for the thread currently holding a lock to

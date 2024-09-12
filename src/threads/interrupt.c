@@ -59,64 +59,82 @@ static inline uint64_t make_idtr_operand (uint16_t limit, void *base);
 /** Interrupt handlers. */
 void intr_handler (struct intr_frame *args);
 static void unexpected_interrupt (const struct intr_frame *);
-
-/** Returns the current interrupt status. */
+
+
+/**
+ * @brief Returns the current interrupt status.
+ * 
+ * @note - use `pushfl` to push the flags regs on the stack, 
+ *       then use `pop` to store the value into local variable `flags`.
+ * @note - `flags` & `FLAG_IF` to get the Interrupt Flag.
+ * 
+ * @details See [IA32-v2b] "PUSHF" and "POP" and [IA32-v3a]
+ *          5.8.1 "Masking Maskable Hardware Interrupts".
+*/
 enum intr_level
-intr_get_level (void) 
-{
+intr_get_level (void) {
   uint32_t flags;
 
-  /* Push the flags register on the processor stack, then pop the
-     value off the stack into `flags'.  See [IA32-v2b] "PUSHF"
-     and "POP" and [IA32-v3a] 5.8.1 "Masking Maskable Hardware
-     Interrupts". */
   asm volatile ("pushfl; popl %0" : "=g" (flags));
 
   return flags & FLAG_IF ? INTR_ON : INTR_OFF;
 }
 
-/** Enables or disables interrupts as specified by LEVEL and
-   returns the previous interrupt status. */
+
+/**
+ * @brief or disables interrupts as specified by `level` and
+ *        returns the previous interrupt status.
+ * @note - if `level` == 1, call `intr_enable()`
+ * @note - if `level` == 0, call `intr_disable()`
+*/
 enum intr_level
-intr_set_level (enum intr_level level) 
-{
+intr_set_level (enum intr_level level) {
   return level == INTR_ON ? intr_enable () : intr_disable ();
 }
 
-/** Enables interrupts and returns the previous interrupt status. */
+
+/**
+ * @brief Enables interrupts and returns the previous interrupt status.
+ * 
+ * @note - call `intr_get_level()` to get interrupt status in `old_level`
+ * @note - use `sti` to enable interrupts
+ * 
+ * @details See [IA32-v2b] "STI" and [IA32-v3a] 5.8.1 "Masking Maskable
+ *          Hardware Interrupts".
+*/
 enum intr_level
-intr_enable (void) 
-{
+intr_enable (void) {
   enum intr_level old_level = intr_get_level ();
   ASSERT (!intr_context ());
 
-  /* Enable interrupts by setting the interrupt flag.
-
-     See [IA32-v2b] "STI" and [IA32-v3a] 5.8.1 "Masking Maskable
-     Hardware Interrupts". */
   asm volatile ("sti");
 
   return old_level;
 }
 
-/** Disables interrupts and returns the previous interrupt status. */
+
+/**
+ * @brief Disables interrupts and returns the previous interrupt status.
+ * 
+ * @note - call `intr_get_level()` to get interrupt status in `old_level`
+ * @note - use `cli` to enable interrupts
+ * 
+ * @details See [IA32-v2b] "CLI" and [IA32-v3a] 5.8.1 "Masking Maskable
+ *          Hardware Interrupts".
+*/
 enum intr_level
-intr_disable (void) 
-{
+intr_disable (void) {
   enum intr_level old_level = intr_get_level ();
 
-  /* Disable interrupts by clearing the interrupt flag.
-     See [IA32-v2b] "CLI" and [IA32-v3a] 5.8.1 "Masking Maskable
-     Hardware Interrupts". */
   asm volatile ("cli" : : : "memory");
 
   return old_level;
 }
 
+
 /** Initializes the interrupt system. */
 void
-intr_init (void)
-{
+intr_init (void) {
   uint64_t idtr_operand;
   int i;
 
@@ -136,16 +154,16 @@ intr_init (void)
   /* Initialize intr_names. */
   for (i = 0; i < INTR_CNT; i++)
     intr_names[i] = "unknown";
-  intr_names[0] = "#DE Divide Error";
-  intr_names[1] = "#DB Debug Exception";
-  intr_names[2] = "NMI Interrupt";
-  intr_names[3] = "#BP Breakpoint Exception";
-  intr_names[4] = "#OF Overflow Exception";
-  intr_names[5] = "#BR BOUND Range Exceeded Exception";
-  intr_names[6] = "#UD Invalid Opcode Exception";
-  intr_names[7] = "#NM Device Not Available Exception";
-  intr_names[8] = "#DF Double Fault Exception";
-  intr_names[9] = "Coprocessor Segment Overrun";
+  intr_names[0]  = "#DE Divide Error";
+  intr_names[1]  = "#DB Debug Exception";
+  intr_names[2]  = "NMI Interrupt";
+  intr_names[3]  = "#BP Breakpoint Exception";
+  intr_names[4]  = "#OF Overflow Exception";
+  intr_names[5]  = "#BR BOUND Range Exceeded Exception";
+  intr_names[6]  = "#UD Invalid Opcode Exception";
+  intr_names[7]  = "#NM Device Not Available Exception";
+  intr_names[8]  = "#DF Double Fault Exception";
+  intr_names[9]  = "Coprocessor Segment Overrun";
   intr_names[10] = "#TS Invalid TSS Exception";
   intr_names[11] = "#NP Segment Not Present";
   intr_names[12] = "#SS Stack Fault Exception";
@@ -162,14 +180,19 @@ intr_init (void)
    purposes.  The interrupt handler will be invoked with
    interrupt status set to LEVEL. */
 static void
-register_handler (uint8_t vec_no, int dpl, enum intr_level level,
-                  intr_handler_func *handler, const char *name)
-{
+register_handler (uint8_t          vec_no,
+                  int               dpl, 
+                  enum intr_level   level,
+                  intr_handler_func *handler,
+                  const char        *name) {
   ASSERT (intr_handlers[vec_no] == NULL);
-  if (level == INTR_ON)
+
+  if (level == INTR_ON){
     idt[vec_no] = make_trap_gate (intr_stubs[vec_no], dpl);
-  else
+  } else {
     idt[vec_no] = make_intr_gate (intr_stubs[vec_no], dpl);
+  }
+
   intr_handlers[vec_no] = handler;
   intr_names[vec_no] = name;
 }
@@ -178,12 +201,14 @@ register_handler (uint8_t vec_no, int dpl, enum intr_level level,
    is named NAME for debugging purposes.  The handler will
    execute with interrupts disabled. */
 void
-intr_register_ext (uint8_t vec_no, intr_handler_func *handler,
-                   const char *name) 
-{
+intr_register_ext (uint8_t           vec_no,
+                   intr_handler_func *handler,
+                   const char        *name)  {
   ASSERT (vec_no >= 0x20 && vec_no <= 0x2f);
+
   register_handler (vec_no, 0, INTR_OFF, handler, name);
 }
+
 
 /** Registers internal interrupt VEC_NO to invoke HANDLER, which
    is named NAME for debugging purposes.  The interrupt handler
@@ -199,18 +224,20 @@ intr_register_ext (uint8_t vec_no, intr_handler_func *handler,
    "Accessing Nonconforming Code Segments" for further
    discussion. */
 void
-intr_register_int (uint8_t vec_no, int dpl, enum intr_level level,
-                   intr_handler_func *handler, const char *name)
-{
+intr_register_int (uint8_t           vec_no,
+                   int               dpl, 
+                   enum intr_level   level,
+                   intr_handler_func *handler,
+                   const char        *name) {
   ASSERT (vec_no < 0x20 || vec_no > 0x2f);
+
   register_handler (vec_no, dpl, level, handler, name);
 }
 
 /** Returns true during processing of an external interrupt
    and false at all other times. */
 bool
-intr_context (void) 
-{
+intr_context (void) {
   return in_external_intr;
 }
 
@@ -219,8 +246,7 @@ intr_context (void)
    returning from the interrupt.  May not be called at any other
    time. */
 void
-intr_yield_on_return (void) 
-{
+intr_yield_on_return (void) {
   ASSERT (intr_context ());
   yield_on_return = true;
 }
@@ -235,8 +261,7 @@ intr_yield_on_return (void)
    interrupts 0...15 are delivered to interrupt vectors 32...47
    (0x20...0x2f) instead. */
 static void
-pic_init (void)
-{
+pic_init (void) {
   /* Mask all interrupts on both PICs. */
   outb (PIC0_DATA, 0xff);
   outb (PIC1_DATA, 0xff);
@@ -262,8 +287,7 @@ pic_init (void)
    If we don't acknowledge the IRQ, it will never be delivered to
    us again, so this is important.  */
 static void
-pic_end_of_interrupt (int irq) 
-{
+pic_end_of_interrupt (int irq) {
   ASSERT (irq >= 0x20 && irq < 0x30);
 
   /* Acknowledge master PIC. */
@@ -273,7 +297,7 @@ pic_end_of_interrupt (int irq)
   if (irq >= 0x28)
     outb (0xa0, 0x20);
 }
-
+
 /** Creates an gate that invokes FUNCTION.
 
    The gate has descriptor privilege level DPL, meaning that it
@@ -291,8 +315,9 @@ pic_end_of_interrupt (int irq)
    [IA32-v3a] section 5.12.1.2 "Flag Usage By Exception- or
    Interrupt-Handler Procedure" for discussion. */
 static uint64_t
-make_gate (void (*function) (void), int dpl, int type)
-{
+make_gate (void (*function) (void),
+           int  dpl,
+           int  type) {
   uint32_t e0, e1;
 
   ASSERT (function != NULL);
@@ -334,7 +359,7 @@ make_idtr_operand (uint16_t limit, void *base)
 {
   return limit | ((uint64_t) (uint32_t) base << 16);
 }
-
+
 /** Interrupt handlers. */
 
 /** Handler for all interrupts, faults, and exceptions.  This

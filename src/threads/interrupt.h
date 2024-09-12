@@ -4,12 +4,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/** Interrupts on or off? */
-enum intr_level 
-  {
-    INTR_OFF,             /**< Interrupts disabled. */
-    INTR_ON               /**< Interrupts enabled. */
-  };
+/** @enum  intr_level
+ * @brief Interrupts on or off?
+ * 
+ * @note - `INTR_OFF` 0  Interrupts disabled.
+ * @note - `INTR_ON`  1  Interrupts enabled.
+*/
+enum intr_level {
+  INTR_OFF, 
+  INTR_ON
+};
 
 enum intr_level intr_get_level (void);
 enum intr_level intr_set_level (enum intr_level);

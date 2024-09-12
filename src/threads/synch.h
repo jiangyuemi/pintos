@@ -4,12 +4,16 @@
 #include <list.h>
 #include <stdbool.h>
 
-/** A counting semaphore. */
-struct semaphore 
-  {
-    unsigned value;             /**< Current value. */
-    struct list waiters;        /**< List of waiting threads. */
-  };
+/** @struct semaphore
+ * @brief info A counting semaphore, represents a semaphore.
+ * 
+ * @note - `value` : Current value.
+ * @note - `waiters` : List of waiting threads.
+*/
+struct semaphore {
+  unsigned value;
+  struct list waiters;
+};
 
 void sema_init (struct semaphore *, unsigned value);
 void sema_down (struct semaphore *);
