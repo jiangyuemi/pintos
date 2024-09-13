@@ -53,6 +53,7 @@ static void pic_init (void);
 static void pic_end_of_interrupt (int irq);
 
 /** Interrupt Descriptor Table helpers. */
+
 static uint64_t make_intr_gate (void (*) (void), int dpl);
 static uint64_t make_trap_gate (void (*) (void), int dpl);
 static inline uint64_t make_idtr_operand (uint16_t limit, void *base);
@@ -134,6 +135,14 @@ intr_disable (void) {
 
 
 /** Initializes the interrupt system. */
+
+/**
+ * @brief
+ * 
+ * @note - Passing 0 to call `make_intr_gate (intr_stubs[i], 0)`,
+ *         shows it has the most privileged code.
+ *         (usually it is kernel of an operating system)
+*/
 void
 intr_init (void) {
   uint64_t idtr_operand;
@@ -284,10 +293,6 @@ pic_init (void) {
   outb (PIC1_DATA, 0x00);
 }
 
-/** Sends an end-of-interrupt signal(EOI) to the PIC for the given IRQ.
-   If we don't acknowledge the IRQ, it will never be delivered to
-   us again, so this is important.  */
-
 /**
  * @brief Send an EOI signal to PIC, ask it reset the ISR bits.
  * 
@@ -301,11 +306,11 @@ pic_end_of_interrupt (int irq) {
   ASSERT (irq >= 0x20 && irq < 0x30);
 
   /* Acknowledge master PIC. */
-  outb (0x20, 0x20);
+  outb (PIC0_CTRL, 0x20);
 
   /* Acknowledge slave PIC if this is a slave interrupt. */
   if (irq >= 0x28)
-    outb (0xa0, 0x20);
+    outb (PIC1_CTRL, 0x20);
 }
 
 /** Creates an gate that invokes FUNCTION.
@@ -324,6 +329,13 @@ pic_end_of_interrupt (int irq) {
    disables interrupts, but entering a trap gate does not.  See
    [IA32-v3a] section 5.12.1.2 "Flag Usage By Exception- or
    Interrupt-Handler Procedure" for discussion. */
+
+/**
+ * @details Gate type value: `Task Gate=0x5`, `Interrupt Gate=0xE`, `Trap Gate=0xF`
+ *          `Call Gate=0xC`.
+ * 
+ * @note - Use `ASSERT` check the value of the `dpl` and `(gate)type`
+*/
 static uint64_t
 make_gate (void (*function) (void),
            int  dpl,
@@ -346,11 +358,20 @@ make_gate (void (*function) (void),
   return e0 | ((uint64_t) e1 << 32);
 }
 
-/** Creates an interrupt gate that invokes FUNCTION with the given
-   DPL. */
+
+/**
+ * @brief Creates an interrupt gate that invokes FUNCTION with the given
+ *        DPL
+ * 
+ * @param[in] (*function)(void) the entry address of some function
+ * @param[in] dpl dpl=0...3, represent the privilege level
+ * 
+ * @note - Call `make_gate(function, dpl, 14)`, 14(0xE) is the value
+ *         of interrupt gate type.
+*/
 static uint64_t
-make_intr_gate (void (*function) (void), int dpl)
-{
+make_intr_gate (void (*function) (void),
+                int  dpl) {
   return make_gate (function, dpl, 14);
 }
 
