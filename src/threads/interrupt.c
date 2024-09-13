@@ -22,9 +22,10 @@
 #define INTR_CNT 256
 
 /** The Interrupt Descriptor Table (IDT).  The format is fixed by
-   the CPU.  See [IA32-v3a] sections 5.10 "Interrupt Descriptor
-   Table (IDT)", 5.11 "IDT Descriptors", 5.12.1.2 "Flag Usage By
-   Exception- or Interrupt-Handler Procedure". */
+   the CPU.  See :
+   [IA32-v3a] sections 5.10 "Interrupt Descriptor Table (IDT)"
+                       5.11 "IDT Descriptors"
+                       5.12.1.2 "Flag Usage By Exception- or Interrupt-Handler Procedure". */
 static uint64_t idt[INTR_CNT];
 
 /** Interrupt handler functions for each interrupt. */
@@ -268,13 +269,13 @@ pic_init (void) {
 
   /* Initialize master. */
   outb (PIC0_CTRL, 0x11); /**< ICW1: single mode, edge triggered, expect ICW4. */
-  outb (PIC0_DATA, 0x20); /**< ICW2: line IR0...7 -> irq 0x20...0x27. */
+  outb (PIC0_DATA, 0x20); /**< ICW2: line IR[0...7] -> IRQ[0x20...0x27]. */
   outb (PIC0_DATA, 0x04); /**< ICW3: slave PIC on line IR2. */
   outb (PIC0_DATA, 0x01); /**< ICW4: 8086 mode, normal EOI, non-buffered. */
 
   /* Initialize slave. */
   outb (PIC1_CTRL, 0x11); /**< ICW1: single mode, edge triggered, expect ICW4. */
-  outb (PIC1_DATA, 0x28); /**< ICW2: line IR0...7 -> irq 0x28...0x2f. */
+  outb (PIC1_DATA, 0x28); /**< ICW2: line IR[0...7] -> IRQ[0x28...0x2f]. */
   outb (PIC1_DATA, 0x02); /**< ICW3: slave ID is 2. */
   outb (PIC1_DATA, 0x01); /**< ICW4: 8086 mode, normal EOI, non-buffered. */
 
@@ -283,9 +284,18 @@ pic_init (void) {
   outb (PIC1_DATA, 0x00);
 }
 
-/** Sends an end-of-interrupt signal to the PIC for the given IRQ.
+/** Sends an end-of-interrupt signal(EOI) to the PIC for the given IRQ.
    If we don't acknowledge the IRQ, it will never be delivered to
    us again, so this is important.  */
+
+/**
+ * @brief Send an EOI signal to PIC, ask it reset the ISR bits.
+ * 
+ * @param[in] irq This IRQ value used to check whether this Interrupt
+ *                called by PIC to CPU.
+ * 
+ * @note We set PIC in non-AEOI mode, so need to send EOI signal.
+*/
 static void
 pic_end_of_interrupt (int irq) {
   ASSERT (irq >= 0x20 && irq < 0x30);
