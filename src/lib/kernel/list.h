@@ -105,8 +105,25 @@ struct list
    name of the outer structure STRUCT and the member name MEMBER
    of the list element.  See the big comment at the top of the
    file for an example. */
-#define list_entry(LIST_ELEM, STRUCT, MEMBER)           \
-        ((STRUCT *) ((uint8_t *) &(LIST_ELEM)->next     \
+
+/**
+ * @brief Convert a pointer (`LIST_ELEM`) which refers to inner member
+ *        (`MEMBER`), to refer to outside struct(`STRUCT`).
+ * 
+ * @param[in] LIST_ELEM  A pointer refer to a list element, which type is `MEMBER`.
+ * @param[in] STRUCT A symbolic represent a struct that containing the `LIST_ELEM`.
+ * @param[in] MEMBER A symbolic represent a member defined in the struct `STRUCT`.
+ * 
+ * @param &(LIST_ELEM->next) The address of the list element.
+ * 
+ * @note - Use the macro `offsetof` to get the offset of the `MEMBER`
+ *         in `STRUCT`, and compute the address of `STRUCT`, that is 
+ *         `&(LIST_ELEM->next)-offset`.
+ * @note - Convert the type to `STRUCT*` to access other members in
+ *         the `STRUCT`
+*/
+#define list_entry(LIST_ELEM, STRUCT, MEMBER)             \
+        ((STRUCT *) ((uint8_t *) &((LIST_ELEM)->next)     \
                      - offsetof (STRUCT, MEMBER.next)))
 
 /** List initialization.
