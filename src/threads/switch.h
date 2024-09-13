@@ -39,8 +39,6 @@ struct switch_threads_frame
  * 
  * @todo what meaning the return ?
  * @todo understand the thread switch (think about xv6)
- * @todo in switch_threads, care about the regs: movl SWITCH_CUR(%esp), %eax
- *       because it is the return regs.
 */
 struct thread *switch_threads (struct thread *cur,
                                struct thread *next);

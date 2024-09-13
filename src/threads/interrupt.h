@@ -4,12 +4,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/** Interrupts on or off? */
-enum intr_level 
-  {
-    INTR_OFF,             /**< Interrupts disabled. */
-    INTR_ON               /**< Interrupts enabled. */
-  };
+/** @enum  intr_level
+ * @brief Interrupts on or off?
+ * 
+ * @note - `INTR_OFF` 0  Interrupts disabled.
+ * @note - `INTR_ON`  1  Interrupts enabled.
+*/
+enum intr_level {
+  INTR_OFF, 
+  INTR_ON
+};
 
 enum intr_level intr_get_level (void);
 enum intr_level intr_set_level (enum intr_level);
@@ -46,7 +50,7 @@ struct intr_frame
        This frame pointer eases interpretation of backtraces. */
     void *frame_pointer;        /**< Saved EBP (frame pointer). */
 
-    /* Pushed by the CPU.
+    /* Pushed by the CPU.    CPU自己做的事情
        These are the interrupted task's saved registers. */
     void (*eip) (void);         /**< Next instruction to execute. */
     uint16_t cs, :16;           /**< Code segment for eip. */

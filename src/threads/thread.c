@@ -100,8 +100,7 @@ thread_init (void)
 /** Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
 void
-thread_start (void) 
-{
+thread_start (void)  {
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
@@ -206,15 +205,20 @@ thread_create (const char  *name,
   return tid;
 }
 
-/** Puts the current thread to sleep.  It will not be scheduled
-   again until awoken by thread_unblock().
-
-   This function must be called with interrupts turned off.  It
-   is usually a better idea to use one of the synchronization
-   primitives in synch.h. */
+/**
+ * @brief Puts the current thread to sleep.
+ * 
+ * @note It is usually a better idea to use one of the synchronization
+ *       primitives in `synch.h`.
+ * @note - Change current thread\'s `status` to `THREAD_BLOCKED`.
+ * @note - Call `schedule()`.
+ * 
+ * @warning - the blocked thread will not be scheduled again until
+ *            awoken by `thread_unblock()`.
+ * @warning - This function must be called with interrupts turned off.
+*/
 void
-thread_block (void) 
-{
+thread_block (void) {
   ASSERT (!intr_context ());
   ASSERT (intr_get_level () == INTR_OFF);
 
