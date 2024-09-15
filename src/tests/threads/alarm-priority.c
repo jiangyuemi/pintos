@@ -49,10 +49,13 @@ alarm_priority_thread (void *aux UNUSED)
   /* Now we know we're at the very beginning of a timer tick, so
      we can call timer_sleep() without worrying about races
      between checking the time and a timer interrupt. */
-  timer_sleep (wake_time - timer_ticks ());
+  int64_t ti = wake_time - timer_ticks ();
+  int64_t st = timer_ticks();
+
+  timer_sleep (ti);
 
   /* Print a message on wake-up. */
-  msg ("Thread %s woke up.", thread_name ());
+  msg ("***Thread %s woke up, sleep %d, from [%d , %d]", thread_name (), ti, st, timer_ticks());
 
   sema_up (&wait_sema);
 }

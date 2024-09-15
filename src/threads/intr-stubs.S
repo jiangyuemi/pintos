@@ -29,7 +29,7 @@ intr_entry:
 	mov $SEL_KDSEG, %eax	/* Initialize segment registers. */
 	mov %eax, %ds
 	mov %eax, %es
-	leal 56(%esp), %ebp	/* Set up frame pointer. */
+	leal 56(%esp), %ebp	/* Set up frame pointer. points to intr_frame? */
 
 	/* Call interrupt handler. */
 	pushl %esp

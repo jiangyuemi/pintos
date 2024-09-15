@@ -139,9 +139,9 @@ intr_disable (void) {
 /**
  * @brief
  * 
- * @note - Passing 0 to call `make_intr_gate (intr_stubs[i], 0)`,
- *         shows it has the most privileged code.
- *         (usually it is kernel of an operating system)
+ * @note - Call `make_intr_gate (intr_stubs[i], 0)`, which
+ *         `dpl=0` shows it has the most privileged code.
+ * 
 */
 void
 intr_init (void) {
@@ -162,8 +162,10 @@ intr_init (void) {
   asm volatile ("lidt %0" : : "m" (idtr_operand));
 
   /* Initialize intr_names. */
-  for (i = 0; i < INTR_CNT; i++)
+  for (i = 0; i < INTR_CNT; i++){
     intr_names[i] = "unknown";
+  }
+
   intr_names[0]  = "#DE Divide Error";
   intr_names[1]  = "#DB Debug Exception";
   intr_names[2]  = "NMI Interrupt";
@@ -233,6 +235,27 @@ intr_register_ext (uint8_t           vec_no,
    [IA32-v3a] sections 4.5 "Privilege Levels" and 4.8.1.1
    "Accessing Nonconforming Code Segments" for further
    discussion. */
+
+/**
+ * @brief Registers handler to be called when internal interrupt numbered vec is
+ *        triggered.
+ * 
+ * @param[in] vec_no Interrupt numbered.
+ * @param[in] dpl Determines how the interrupt can be invoked.
+ * @param[in] level Equal `INTR_ON/INTR_OFF`.
+ * @param[in] handler Address of the interrupt `vec_no` handler.
+ * @param[in] name Interrupt name, for debug.
+ * 
+ * @note - If `dpl` is 0: the interrupt can be invoked only by kernel threads.
+ * @note - Otherwise `dpl` is 3: allows user processes to invoke the interrupt
+ *         with an explicit INT instruction.
+ * @note - level is special here, it's different from whether calling `intr_disable()`
+ *         in handler, if it is `INTR_ON`, external interrupts will be processed normally
+ *         during the interrupt handler's execution. But if it is `INTR_OFF`, the 
+ *         difference is it leaves a window of one or more CPU instructions in which 
+ *         external interrupts are still enabled, which is important for the page fault
+ *         handler (further discussion see `userprog/exception.c`)
+*/
 void
 intr_register_int (uint8_t           vec_no,
                    int               dpl, 
@@ -240,7 +263,6 @@ intr_register_int (uint8_t           vec_no,
                    intr_handler_func *handler,
                    const char        *name) {
   ASSERT (vec_no < 0x20 || vec_no > 0x2f);
-
   register_handler (vec_no, dpl, level, handler, name);
 }
 
@@ -293,6 +315,7 @@ pic_init (void) {
   outb (PIC1_DATA, 0x00);
 }
 
+
 /**
  * @brief Send an EOI signal to PIC, ask it reset the ISR bits.
  * 
@@ -313,28 +336,20 @@ pic_end_of_interrupt (int irq) {
     outb (PIC1_CTRL, 0x20);
 }
 
-/** Creates an gate that invokes FUNCTION.
-
-   The gate has descriptor privilege level DPL, meaning that it
-   can be invoked intentionally when the processor is in the DPL
-   or lower-numbered ring.  In practice, DPL==3 allows user mode
-   to call into the gate and DPL==0 prevents such calls.  Faults
-   and exceptions that occur in user mode still cause gates with
-   DPL==0 to be invoked.  See [IA32-v3a] sections 4.5 "Privilege
-   Levels" and 4.8.1.1 "Accessing Nonconforming Code Segments"
-   for further discussion.
-
-   TYPE must be either 14 (for an interrupt gate) or 15 (for a
-   trap gate).  The difference is that entering an interrupt gate
-   disables interrupts, but entering a trap gate does not.  See
-   [IA32-v3a] section 5.12.1.2 "Flag Usage By Exception- or
-   Interrupt-Handler Procedure" for discussion. */
 
 /**
- * @details Gate type value: `Task Gate=0x5`, `Interrupt Gate=0xE`, `Trap Gate=0xF`
- *          `Call Gate=0xC`.
+ * @brief Create an gate, which can call the given `function`.
  * 
- * @note - Use `ASSERT` check the value of the `dpl` and `(gate)type`
+ * @details See: [IA32-v3a] sections
+ *            - 4.5 "Privilege Levels" 
+ *            - 4.8.1.1 "Accessing Nonconforming Code Segments"
+ *            - 5.12.1.2 "Flag Usage By Exception- or Interrupt-Handler Procedure"
+ * 
+ * @note - You can see all the xxx_Gate in file `/pintos/docs/XXX_Gate.md`
+ * 
+ * 
+ * @warning Here, we only use `make_gate()` for Interrupt_Gate/Trap_Gate,
+ *          that means `type` only can be 14/15(0xE/0xF).
 */
 static uint64_t
 make_gate (void (*function) (void),
@@ -346,21 +361,21 @@ make_gate (void (*function) (void),
   ASSERT (dpl >= 0 && dpl <= 3);
   ASSERT (type >= 0 && type <= 15);
 
-  e0 = (((uint32_t) function & 0xffff)     /**< Offset 15:0. */
-        | (SEL_KCSEG << 16));              /**< Target code segment. */
+  e0 = (((uint32_t) function & 0xffff)     /**< Offset 15:0 */
+        | (SEL_KCSEG << 16));              /**< Segment Selector */
 
-  e1 = (((uint32_t) function & 0xffff0000) /**< Offset 31:16. */
-        | (1 << 15)                        /**< Present. */
-        | ((uint32_t) dpl << 13)           /**< Descriptor privilege level. */
-        | (0 << 12)                        /**< System. */
-        | ((uint32_t) type << 8));         /**< Gate type. */
+  e1 = (((uint32_t) function & 0xffff0000) /**< Offset 31:16 */
+        | (1 << 15)                        /**< P */
+        | ((uint32_t) dpl << 13)           /**< DPL */
+        | (0 << 12)                        /**< D: 0 means 16-bits */
+        | ((uint32_t) type << 8));         /**< Type */
 
   return e0 | ((uint64_t) e1 << 32);
 }
 
 
 /**
- * @brief Creates an interrupt gate that invokes FUNCTION with the given
+ * @brief Creates an interrupt gate that invokes `function` with the given
  *        DPL
  * 
  * @param[in] (*function)(void) the entry address of some function
@@ -372,34 +387,51 @@ make_gate (void (*function) (void),
 static uint64_t
 make_intr_gate (void (*function) (void),
                 int  dpl) {
-  return make_gate (function, dpl, 14);
+  return make_gate (function, dpl, 0xE);
 }
 
-/** Creates a trap gate that invokes FUNCTION with the given
-   DPL. */
+
+
+
+/**
+ * @brief Creates an interrupt gate that invokes `function` with the given
+ *        DPL
+ * 
+ * @param[in] (*function)(void) the entry address of some function
+ * @param[in] dpl dpl=0...3, represent the privilege level
+ * 
+ * @note - Call `make_gate(function, dpl, 15)`, 14(0xF) is the value
+ *         of trap gate type.
+*/
 static uint64_t
-make_trap_gate (void (*function) (void), int dpl)
-{
-  return make_gate (function, dpl, 15);
+make_trap_gate (void (*function) (void), int dpl) {
+  return make_gate (function, dpl, 0xF);
 }
 
-/** Returns a descriptor that yields the given LIMIT and BASE when
-   used as an operand for the LIDT instruction. */
+
+/**
+ * @brief Return a descriptor that yields the given `limit` and `base`,
+ *        which used for `LIDT` instruction.
+*/
 static inline uint64_t
-make_idtr_operand (uint16_t limit, void *base)
-{
+make_idtr_operand (uint16_t limit, void *base) {
   return limit | ((uint64_t) (uint32_t) base << 16);
 }
 
 /** Interrupt handlers. */
 
-/** Handler for all interrupts, faults, and exceptions.  This
-   function is called by the assembly language interrupt stubs in
-   intr-stubs.S.  FRAME describes the interrupt and the
-   interrupted thread's registers. */
+/** 
+ * @brief Handler for all interrupts, faults, and exceptions.  
+ * 
+ * This function is called by the assembly language interrupt stubs in 
+ * intr-stubs.S.  FRAME describes the interrupt and the 
+ * interrupted thread's registers.
+ * 
+ * @todo Explain why create the  local variables `in_external_intr` and
+ *       `yield_on_return` in external interrupt.
+*/
 void
-intr_handler (struct intr_frame *frame) 
-{
+intr_handler (struct intr_frame *frame) {
   bool external;
   intr_handler_func *handler;
 
@@ -408,27 +440,26 @@ intr_handler (struct intr_frame *frame)
      and they need to be acknowledged on the PIC (see below).
      An external interrupt handler cannot sleep. */
   external = frame->vec_no >= 0x20 && frame->vec_no < 0x30;
-  if (external) 
-    {
-      ASSERT (intr_get_level () == INTR_OFF);
-      ASSERT (!intr_context ());
+  if (external) {
+    ASSERT (intr_get_level () == INTR_OFF);
+    ASSERT (!intr_context ());
 
-      in_external_intr = true;
-      yield_on_return = false;
-    }
+    in_external_intr = true;
+    yield_on_return = false;
+  }
 
   /* Invoke the interrupt's handler. */
   handler = intr_handlers[frame->vec_no];
-  if (handler != NULL)
+
+  if (handler != NULL){
     handler (frame);
-  else if (frame->vec_no == 0x27 || frame->vec_no == 0x2f)
-    {
+  } else if (frame->vec_no == 0x27 || frame->vec_no == 0x2f) {
       /* There is no handler, but this interrupt can trigger
          spuriously due to a hardware fault or hardware race
          condition.  Ignore it. */
-    }
-  else
+  } else {
     unexpected_interrupt (frame);
+  }
 
   /* Complete the processing of an external interrupt. */
   if (external) 
@@ -486,9 +517,9 @@ intr_dump_frame (const struct intr_frame *f)
           f->cs, f->ds, f->es, f->ss);
 }
 
-/** Returns the name of interrupt VEC. */
+
+/** @brief Used to Debug, return the name of interrupt `vec` */
 const char *
-intr_name (uint8_t vec) 
-{
+intr_name (uint8_t vec) {
   return intr_names[vec];
 }

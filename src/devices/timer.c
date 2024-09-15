@@ -35,6 +35,7 @@ static void real_time_delay (int64_t num, int32_t denom);
 void
 timer_init (void) 
 {
+  // list_init(&sleep_list);
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
@@ -89,11 +90,30 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  if(ticks <= 0 ){
+    return;
+  }
+
+  struct thread* t = thread_current();
+  enum intr_level old_level;
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  ASSERT (t->status == THREAD_RUNNING);
+  
+  old_level = intr_disable();
+
+  t->sleep_intervals_ = ticks;
+  t->sleep_time_ = 0;
+
+  thread_block();
+
+  intr_set_level (old_level);
+
+  // int64_t start = timer_ticks ();
+  // ASSERT (intr_get_level () == INTR_ON);
+  // while (timer_elapsed (start) < ticks) {
+  //   thread_yield ();
+  // }
 }
 
 /** Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -165,13 +185,48 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
+
+/**
+ * @todo delete the intr_disable, test will wrong:
+ *       `assertion `t->status == THREAD_BLOCKED' failed.`
+ * 
+ * @todo add code `ASSERT(intr_get_level() == INTR_OFF);`
+ *       it can pass.
+*/
+static void
+sleep_wake_up_(struct thread *t, void *aux) {
+
+  //ASSERT(intr_get_level() == INTR_OFF);
+  //enum intr_level old_level;
+  //old_level = intr_disable ();
+
+  if(t->status != THREAD_BLOCKED || t->sleep_intervals_ == -1 || t->sleep_time_ == -1) {
+    //intr_set_level (old_level);
+    return;
+  }
+
+  if(++(t->sleep_time_) >= t->sleep_intervals_) {
+    t->sleep_intervals_ = -1;
+    t->sleep_time_ = -1;
+
+    thread_unblock(t);
+
+    //intr_set_level (old_level);
+  }
+  //intr_set_level (old_level);
+}
+
+
 /** Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  // wake_up_();
+  thread_foreach(sleep_wake_up_, NULL);
 }
 
 /** Returns true if LOOPS iterations waits for more than one timer
