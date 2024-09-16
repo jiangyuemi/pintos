@@ -95,6 +95,9 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  
+  initial_thread->sleep_intervals_ = -1;
+  initial_thread->sleep_time_ = -1;
 }
 
 /** Starts preemptive thread scheduling by enabling interrupts.
@@ -319,7 +322,7 @@ thread_yield (void) {
 
   cur->status = THREAD_READY;
   
-  schedule (); //
+  schedule ();
   
   intr_set_level (old_level);
 }
@@ -484,6 +487,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
+
+  /* initilize param used to sleep */
+  t->sleep_intervals_ = -1;
+  t->sleep_time_ = -1;
+
   list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 }
@@ -642,3 +650,43 @@ allocate_tid (void)
 /** Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+
+void wake_up_(void) {
+  struct list_elem *e;
+  struct thread *t;
+  struct thread *t_numpy[128];
+  int k = -1;
+
+  ASSERT (intr_get_level () == INTR_OFF);
+
+  /** find the sleep thread with higest priority */
+  for (e = list_begin(&all_list); e != list_end (&all_list); e = list_next (e)) {
+    t = list_entry (e, struct thread, allelem);
+    if(t->status != THREAD_BLOCKED || t->sleep_intervals_ == -1 || t->sleep_time_ == -1) {
+      continue;
+    }
+
+    t->sleep_time_ ++;
+
+    if(t->sleep_time_ >= t->sleep_intervals_) {
+      if(k == -1 || t_numpy[k]->priority < t->priority){
+        k = 0;
+        t_numpy[k] = t;
+      } else if(t_numpy[k]->priority == t->priority) {
+        t_numpy[++k] = t;
+      }
+    }
+  }
+  
+  /** wake up it */
+  if(k != -1){
+    for(int i = 0; i <= k; ++i) {
+      t = t_numpy[i];
+      t->sleep_intervals_ = -1;
+      t->sleep_time_ = -1;
+
+      thread_unblock(t);
+    }
+  }
+}
